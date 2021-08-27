@@ -1,86 +1,52 @@
-"""Braitenberg-based obstacle-avoiding robot controller."""
+from turtle import Screen
+from snake import Snake
+from food import Food
+from scoreboard import Scoreboard
+import time
 
-from controller import Robot
-from controller import Compass
+screen = Screen()
+screen.setup(width=600, height=600)
+screen.bgcolor("black")
+screen.title("My Snake Game")
+screen.tracer(0)
 
-# Get reference to the robot.
-robot = Robot()
+snake = Snake()
+food = Food()
+scoreboard = Scoreboard()
 
-# Get simulation step length.
-timeStep = int(robot.getBasicTimeStep())
+screen.listen()
+screen.onkey(lambda:  snake.up, "Up")
+screen.onkey(lambda: snake.down, "Down")
+screen.onkey(lambda: snake.left, "Left")
+screen.onkey(lambda: snake.right, "Right")
 
-# Constants of the Thymio II motors and distance sensors.
-maxMotorVelocity = 9.53
-distanceSensorCalibrationConstant = 360
+game_is_on = True
+while game_is_on:
+    screen.update()
+    time.sleep(0.1)
+    snake.move()
 
-# Get left and right wheel motors.
-leftMotor = robot.getMotor("motor.left")
-rightMotor = robot.getMotor("motor.right")
+    #Detect collision with food.
+    if snake.head.distance(food) < 15:
+        food.refresh()
+        snake.extend()
+        scoreboard.increase_score()
 
-# get robot's Compass device
-compass = robot.getCompass("compass")
+    #Detect collision with wall.
+    if snake.head.xcor() > 280 or snake.head.xcor() < -280 or snake.head.ycor() > 280 or snake.head.ycor() < -280:
+        game_is_on = False
+        scoreboard.game_over()
 
-# enable the Compass
-compass.enable(timeStep)
+    #Detect collision with tail.
+    for segment in snake.segments:
+        if segment == snake.head:
+            pass
+        elif snake.head.distance(segment) < 10:
+            game_is_on = False
+            scoreboard.game_over()
 
-# Get frontal distance sensors.
-outerLeftSensor = robot.getDistanceSensor("prox.horizontal.0")
-centralLeftSensor = robot.getDistanceSensor("prox.horizontal.1")
-centralSensor = robot.getDistanceSensor("prox.horizontal.2")
-centralRightSensor = robot.getDistanceSensor("prox.horizontal.3")
-outerRightSensor = robot.getDistanceSensor("prox.horizontal.4")
 
-# Enable distance sensors.
-outerLeftSensor.enable(timeStep)
-centralLeftSensor.enable(timeStep)
-centralSensor.enable(timeStep)
-centralRightSensor.enable(timeStep)
-outerRightSensor.enable(timeStep)
 
-# Disable motor PID control mode.
-leftMotor.setPosition(float('inf'))
-rightMotor.setPosition(float('inf'))
 
-# Set ideal motor velocity.
-initialVelocity = maxMotorVelocity
 
-# Set the initial velocity of the left and right wheel motors.
-leftMotor.setVelocity(initialVelocity)
-rightMotor.setVelocity(initialVelocity)
-
-while robot.step(timeStep) != -1:
-
-    # Read values from four distance sensors and calibrate.
-    outerLeftSensorValue = outerLeftSensor.getValue() / distanceSensorCalibrationConstant
-    centralLeftSensorValue = centralLeftSensor.getValue() / distanceSensorCalibrationConstant
-    centralSensorValue = centralSensor.getValue() / distanceSensorCalibrationConstant
-    centralRightSensorValue = centralRightSensor.getValue() / distanceSensorCalibrationConstant
-    outerRightSensorValue = outerRightSensor.getValue() / distanceSensorCalibrationConstant
-
-    # current Compass measurement.
-    # The returned vector indicates the north direction in the coordinate system of the Compass device
-    # Desired compass values: [x,y,z] : [0,1,2] : x for north, z for left and right
-    compassValues = compass.getValues()
-    print
-    "compass:" + str(compassValues)
-
-    # Set wheel velocities based on sensor values
-    # Will turns right if the central sensor is triggered.
-    leftMotor.setVelocity(initialVelocity - (centralRightSensorValue + outerRightSensorValue) / 1)
-    rightMotor.setVelocity(initialVelocity - (centralLeftSensorValue + outerLeftSensorValue) / 1 - centralSensorValue)
-
-    if centralRightSensorValue == 0 and outerRightSensorValue == 0:
-        if centralLeftSensorValue == 0 and outerLeftSensorValue == 0:
-            # If no obstacle stands in our way --> y =  0.009330825235785215
-            # if there is an obstacle the way
-            # and the obstacle is on the left, turn right
-            if compassValues[1] < 0.0093 and compassValues[0] < -0.1:
-                leftMotor.setVelocity(8.53)
-                rightMotor.setVelocity(initialVelocity)
-                # print "turn right"
-            # if there is an obstacle on the right, turn left
-            if compassValues[1] < 0.0093 and compassValues[0] > 0.1:
-                leftMotor.setVelocity(initialVelocity)
-                rightMotor.setVelocity(8.53)
-                # print "turn left"
-
+screen.exitonclick()
